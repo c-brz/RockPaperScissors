@@ -417,3 +417,16 @@ class RPSRepresentationDataset(torch.utils.data.Dataset):
                 data = self.transform(data)
             
         return data, label
+
+mp_hands = mp.solutions.hands
+
+def extract_hand_landmarks(image_path):
+    image = cv2.imread(image_path)
+    image_rgb = cv2.cvtColor(image, cv2.COLOR_BGR2RGB)
+
+    with mp_hands.Hands(static_image_mode=True, max_num_hands=1) as hands:
+        results = hands.process(image_rgb)
+        if results.multi_hand_landmarks:
+            landmarks = results.multi_hand_landmarks[0]
+            return np.array([[lm.x, lm.y, lm.z] for lm in landmarks.landmark]).flatten()
+    return None
