@@ -35,7 +35,8 @@ from sklearn.model_selection import train_test_split
 import matplotlib.pyplot as plt
 
 #from modules.dataset import RPSDataset
-DATASET_PATH = "/Users/christina/.cache/kagglehub/datasets/drgfreeman/rockpaperscissors/versions/2"
+# DATASET_PATH = "/Users/christina/.cache/kagglehub/datasets/drgfreeman/rockpaperscissors/versions/2"
+DATASET_PATH = "/data"
 
 # --- Setup path so imports work ---
 # sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
