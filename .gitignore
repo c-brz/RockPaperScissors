@@ -1,8 +1,11 @@
 examples/saved_models/
 .DS_Store
-modules/__pycache__/
 2
 *.png
 rps_venv
 
 my_rps_dataset/data/
+
+__pycache__/
+*.pkl
+*.pth
