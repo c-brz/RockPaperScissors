@@ -35,8 +35,9 @@ from sklearn.model_selection import train_test_split
 import matplotlib.pyplot as plt
 
 #from modules.dataset import RPSDataset
-# DATASET_PATH = "/Users/christina/.cache/kagglehub/datasets/drgfreeman/rockpaperscissors/versions/2"
-DATASET_PATH = "/data"
+#DATASET_PATH = "/Users/christina/.cache/kagglehub/datasets/drgfreeman/rockpaperscissors/versions/2"
+#DATASET_PATH = "/data"
+DATASET_PATH = "/Users/christina/code/RockPaperScissors/2"
 
 # --- Setup path so imports work ---
 # sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
@@ -44,7 +45,6 @@ DATASET_PATH = "/data"
 from modules.dataset import *
 from modules.hand_visualizations import extract_hand_landmarks
 
-# %% [markdown]
 # ## 2. Model Definition
 
 # %%
@@ -129,7 +129,7 @@ def evaluate(model, loader):
 
 
 # Visualization
-def visualize_prediction(model, image_path):
+def visualize_prediction(model, image_path, save=False):
     feature = extract_hand_landmarks(image_path)
     if feature is not None:
         x = torch.tensor(feature, dtype=torch.float32).unsqueeze(0)
@@ -140,13 +140,16 @@ def visualize_prediction(model, image_path):
         plt.imshow(image)
         plt.title(f"Predicted: {label}")
         plt.axis('off')
-        plt.show()
+        if save:
+            plt.savefig(f"prediction_{label}.png")
+        else: 
+            plt.show()
     else:
         print("No hand landmarks detected.")
 
 
 
-def main():
+def main2():
     # dataset_dir = os.path.abspath(os.path.join(os.path.dirname(__file__), '..', 'dataset'))
     # train_paths, test_paths, train_labels, test_labels = load_dataset(dataset_dir)
 
@@ -180,6 +183,61 @@ def main():
     print("\nPrediction example:")
     visualize_prediction(model, test_paths[0])
 
-# %%
+
+def main():
+    
+    ACTIVATIONS = ["relu", "tanh", "sigmoid", "leakyrelu", "gelu"]
+    
+    dataset_dir = DATASET_PATH
+    print(f"Using dataset directory: {dataset_dir}")
+    image_paths, labels = load_dataset(dataset_dir)
+    train_paths, test_paths, train_labels, test_labels = split_dataset(image_paths, labels)
+
+    print(f"Train set size: {len(train_paths)}")
+    print(f"Test set size: {len(test_paths)}")
+
+    results = {}
+
+    for act in ACTIVATIONS:
+        print(f"\n=== Training with activation: {act} ===")
+        train_ds = RPSDataset(train_paths, train_labels)
+        test_ds = RPSDataset(test_paths, test_labels)
+        train_loader = DataLoader(train_ds, batch_size=32, shuffle=True)
+        test_loader = DataLoader(test_ds, batch_size=32)
+
+        model = RPSModel(activation_func=act)
+        criterion = nn.CrossEntropyLoss()
+        optimizer = torch.optim.Adam(model.parameters(), lr=0.001)
+
+        train_accs, test_accs = [], []
+        for epoch in range(5):
+            train_loss, train_acc = train(model, train_loader, criterion, optimizer)
+            test_acc = evaluate(model, test_loader)
+            train_accs.append(train_acc)
+            test_accs.append(test_acc)
+            print(f"Epoch {epoch + 1}: Loss={train_loss:.4f} | Train Acc={train_acc:.4f} | Test Acc={test_acc:.4f}")
+
+        results[act] = {"train_acc": train_accs, "test_acc": test_accs, "model": model, "test_paths": test_paths}
+
+    # Plot results
+    plt.figure(figsize=(10,6))
+    for act in ACTIVATIONS:
+        plt.plot(results[act]["test_acc"], label=f"{act} (test)")
+    plt.xlabel("Epoch")
+    plt.ylabel("Accuracy")
+    plt.title("Test Accuracy per Activation Function")
+    plt.legend()
+    #plt.show()
+    plt.savefig("test_accuracy_per_activation.png")
+    
+    # Visualizations
+    for act in ACTIVATIONS:
+        print(f"\nExample predictions for activation: {act}")
+        model = results[act]["model"]
+        test_paths = results[act]["test_paths"]
+        for i in range(2):  # Show 2 examples per activation
+            visualize_prediction(model, test_paths[i], save=True)
+
+
 if __name__ == "__main__":
     main()
