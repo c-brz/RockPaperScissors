@@ -5,4 +5,16 @@ opencv-python
 matplotlib
 tqdm
 scikit-learn
+numpy
+pillow
+seaborn
+pandas
+pickle-mixin
+
+# Machine Learning & Computer Vision
 roboflow==1.0.0
+ultralytics # for YOLOv8
+
+# Jupyter support
+jupyter
+ipykernel
