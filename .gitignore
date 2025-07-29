@@ -9,3 +9,9 @@ my_rps_dataset/data/
 __pycache__/
 *.pkl
 *.pth
+*.pt
+
+data/
+rock-paper-scissors-11/
+
+runs/
