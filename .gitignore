@@ -11,8 +11,12 @@ pytorch-softdtw-cuda/__pycache__
 *.npz
 data/
 my_rps_dataset/data/
+my_rps_dataset/landmarks/
 my_rps_dataset/features/
-my_rps_dataset/splits.json
+my_rps_dataset/featuresv1/
+my_rps_dataset/features_angles/
+my_rps_dataset/features_coords/
+my_rps_dataset/features_angles2/
 rock-paper-scissors-11/
 runs/
 pytorch-softdtw-cuda/
