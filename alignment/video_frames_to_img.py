@@ -1,16 +1,21 @@
 import os
+import sys
 import cv2
 import numpy as np
 import mediapipe as mp
 
 
-def extract_frame_images(video_dir, destination_dir):
+def extract_frame_images(video_dir, destination_dir, gesture_class=None, save=False):
     """Process all videos in a directory structure"""
     # Expected directory structure: video_dir/gesture_name/video_files
-    gesture_dirs = [
-        d for d in os.listdir(video_dir) if os.path.isdir(os.path.join(video_dir, d))
-    ]
+
+    gesture_dirs = (
+        [d for d in os.listdir(video_dir) if os.path.isdir(os.path.join(video_dir, d))]
+        if gesture_class is None
+        else [gesture_class]
+    )
     print(f"Found gesture directories: {gesture_dirs}")
+
     for gesture_name in gesture_dirs:
         gesture_path = os.path.join(video_dir, gesture_name, "videos")
         video_files = [
@@ -40,13 +45,18 @@ def extract_frame_images(video_dir, destination_dir):
                 image_file = os.path.join(
                     image_dir, f"frame_{str(frame_idx).zfill(3)}.png"
                 )
-                cv2.imwrite(image_file, rgb_frame)
+                if save:
+                    cv2.imwrite(image_file, rgb_frame)
                 frame_idx += 1
             cap.release()
 
 
 if __name__ == "__main__":
+
+    gesture = sys.argv[1] if len(sys.argv) > 1 else None
     extract_frame_images(
-        video_dir="/Users/christina/code/RockPaperScissors/my_rps_dataset/data/align",
-        destination_dir="/Users/christina/code/RockPaperScissors/my_rps_dataset/data/align",
+        video_dir="../../RockPaperScissors/my_rps_dataset/data/align",
+        destination_dir="../../RockPaperScissors/my_rps_dataset/data/align",
+        gesture_class=gesture,
+        save=True,
     )
