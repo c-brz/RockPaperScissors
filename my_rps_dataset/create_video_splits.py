@@ -14,7 +14,7 @@ use_val = True
 
 if __name__ == "__main__":
 
-    # Read DATA_DIR and OUT_FILE from command line arguments if provided
+    # Read DATA_DIR and OUT_FILE from command line if provided or use default otherwieså
     # Flags: --data_dir <path> --out_file <path> --use_val <True/False> --help for usage
     if "--help" in sys.argv or "-h" in sys.argv:
         print(
