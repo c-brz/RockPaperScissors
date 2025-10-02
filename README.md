@@ -1,7 +1,7 @@
 # Rock-Paper-Scissors Hand Gesture Recognition
 
 ## Project Structure
-
+ 
 ### `my_rps_dataset/`
 Core dataset management and preprocessing tools:
 - `record_rps_video.py` - Record webcam videos of hand gestures 
