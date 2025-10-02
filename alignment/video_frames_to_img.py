@@ -1,6 +1,7 @@
 import os
 import sys
 import cv2
+import json
 import numpy as np
 import mediapipe as mp
 
@@ -51,12 +52,55 @@ def extract_frame_images(video_dir, destination_dir, gesture_class=None, save=Fa
             cap.release()
 
 
+def create_empty_metadata_file(destination_dir, gesture_class=None):
+    gesture_dirs = (
+        [
+            d
+            for d in os.listdir(destination_dir)
+            if os.path.isdir(os.path.join(destination_dir, d))
+        ]
+        if gesture_class is None
+        else [gesture_class]
+    )
+    for gesture_name in gesture_dirs:
+
+        image_paths = os.path.join(destination_dir, gesture_name, "images")
+
+        for image_dir in os.listdir(image_paths):
+
+            if gesture_name not in image_dir:
+                continue  # skip .DS_STORE files??
+            metadata_path = os.path.join(image_paths, image_dir, "metadata.json")
+
+            metadata = {
+                "label": gesture_name,
+                "total_frames": 0,
+                "start_frame_idx": 0,
+                "action_frame_idx": 0,
+                "end_frame_idx": 0,
+            }
+
+            if os.path.isfile(metadata_path):
+                print(f"Metadata file already exists at {metadata_path}, skipping...")
+                continue
+            else:
+                with open(metadata_path, "w") as f:
+                    json.dump(metadata, f, indent=4)
+                print(f"Created metadata file at {metadata_path}")
+
+
 if __name__ == "__main__":
 
     gesture = sys.argv[1] if len(sys.argv) > 1 else None
+
     extract_frame_images(
         video_dir="../../RockPaperScissors/my_rps_dataset/data/align",
         destination_dir="../../RockPaperScissors/my_rps_dataset/data/align",
         gesture_class=gesture,
         save=True,
+    )
+
+    create_empty_metadata_file(
+        destination_dir="../../RockPaperScissors/my_rps_dataset/data/align",
+        gesture_class=gesture,
     )
