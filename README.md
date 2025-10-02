@@ -22,9 +22,6 @@ Video processing and data alignment tools:
 - `video_frames_to_img.py` - Extract individual frames from videos
 - `data_check.ipynb` - Validate landmark data at cropped video frames
 
-### `pytorch-softdtw-cuda/`
-CUDA implementation of Soft DTW for PyTorch (external library)
-
 ## Getting Started
 
 1. Set up the environment:
