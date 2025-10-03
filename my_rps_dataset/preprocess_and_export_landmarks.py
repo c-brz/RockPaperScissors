@@ -2,13 +2,17 @@ import os
 import cv2
 import numpy as np
 import mediapipe as mp
+import sys
+
+sys.path.append("..")
+from modules.utils import ALIGN_DIR
 
 
 class RPSLandmarkExtractor:
-    def __init__(self):
+    def __init__(self, hand_static_mode=False):
         self.mp_hands = mp.solutions.hands
         self.hands = self.mp_hands.Hands(
-            static_image_mode=False,
+            static_image_mode=hand_static_mode,
             max_num_hands=1,
             min_detection_confidence=0.5,
             min_tracking_confidence=0.5,
@@ -48,6 +52,34 @@ class RPSLandmarkExtractor:
 
         return np.array(landmarks_sequence)
 
+    def extract_landmarks_from_image(self, image_path, save_data=False):
+        """Extract hand landmarks from image"""
+        frame_paths = [
+            f for f in os.listdir(image_path) if f.endswith((".png", ".jpg"))
+        ]
+        landmarks_sequence = []
+
+        for f in frame_paths:
+            # print(f"Processing image: {f}")
+            image = cv2.imread(os.path.join(image_path, f))
+            rgb_image = cv2.cvtColor(image, cv2.COLOR_BGR2RGB)
+            results = self.hands.process(rgb_image)
+
+            no_hand_frames = 0
+            if results.multi_hand_world_landmarks:
+                hand_landmarks = results.multi_hand_world_landmarks[0]
+                landmarks = []
+                for lm in hand_landmarks.landmark:
+                    landmarks.extend([lm.x, lm.y, lm.z])
+                landmarks_sequence.append(landmarks)
+
+            else:
+                no_hand_frames += 1
+                landmarks_sequence.append([np.nan] * 63)  # 21 landmarks * 3 coordinates
+
+        print(f"Total frames with no hand detected: {no_hand_frames}")
+        return np.array(landmarks_sequence)
+
     def load_landmarks_from_npz(self, npz_path):
         """Load landmarks from a .npz file"""
         # print(f"Loading landmarks from {npz_path}")
@@ -64,7 +96,7 @@ class RPSLandmarkExtractor:
         # print(f"normalize_landmarks(): {landmarks.shape}")
 
         for i in range(len(landmarks)):
-            if np.sum(landmarks[i]) == 0:  # Skip zero frames
+            if np.isnan(landmarks[i]).any():  # Skip nan frames
                 continue
 
             # Reshape to get individual landmarks
@@ -105,7 +137,7 @@ class RPSLandmarkExtractor:
             if hand_size > 0:
                 frame_landmarks = frame_landmarks / hand_size
             else:
-                print(f"Hand size is zero at frame {i}. Skipping normalization.")
+                print(f"    Hand size is zero at frame {i}. Skipping normalization.")
 
             normalized[i] = frame_landmarks.flatten()
 
@@ -327,6 +359,67 @@ class RPSLandmarkExtractor:
 
         return np.array(all_sequences), np.array(all_labels)
 
+    def extract_landmarks_raw_img(self, video_dir, destination_dir, save_data=False):
+        """Process all videos in a directory structure"""
+
+        all_sequences = []
+        all_labels = []
+        data_extensions = (".png", ".jpg", ".jpeg")
+
+        # Expected directory structure: video_dir/gesture_name/video_files
+        gesture_dirs = [
+            d
+            for d in os.listdir(video_dir)
+            if os.path.isdir(os.path.join(video_dir, d))
+        ]
+
+        for gesture_name in gesture_dirs:
+
+            gesture_path = os.path.join(video_dir, gesture_name, "images")
+            print(f" 💡 Gesture path: {gesture_path}")
+
+            video_files = [f for f in os.listdir(gesture_path) if not f.startswith(".")]
+            print(video_files)
+
+            print(
+                f" 🙌🏻 Processing {len(video_files)} videos for gesture: {gesture_name}"
+            )
+
+            for video_file in video_files:
+
+                video_path = os.path.join(gesture_path, video_file)
+                print(f"Processing file: {video_path}")
+                video_file_name = video_file.split("/")[-1]
+                print(f" 💡 Video file name: {video_file_name}")
+                # img_dirs = [
+                #     i
+                #     for i in os.listdir(video_path)
+                #     if (i.endswith(data_extensions) and not i.startswith("."))
+                # ]
+
+                landmarks = self.extract_landmarks_from_image(video_path)
+                # print(f"Extracted landmarks shape: {landmarks.shape}")
+
+                if len(landmarks) > 0:
+                    normalized_landmarks_3d = landmarks.copy()
+                    print(
+                        f"Saving landmarks for {video_file_name} with shape {normalized_landmarks_3d.shape}"
+                    )
+                else:
+                    print(f"No landmarks found for {video_file_name}")
+                    normalized_landmarks_3d = np.array([np.nan] * 63).reshape(-1, 21, 3)
+
+                if save_data:
+                    np.savez(
+                        os.path.join(
+                            destination_dir, f"{video_file_name}_landmarks.npz"
+                        ),
+                        landmarks=normalized_landmarks_3d,
+                        label=gesture_name,
+                    )
+
+        return np.array(all_sequences), np.array(all_labels)
+
     def extract_features_coords(
         self,
         video_dir,
@@ -349,6 +442,12 @@ class RPSLandmarkExtractor:
             )
             # print(f"Loaded landmarks shape: {landmarks}")
 
+            # if np.isnan(landmarks).all():
+            #     print(f"No landmarks found for {gesture_name}")
+            #     normalized_landmarks_3d = np.array([np.nan] * 63).reshape(-1, 21, 3)
+            #     processed_landmarks = normalized_landmarks_3d.copy()
+            # continue
+
             if len(landmarks) > 0:
                 # Normalize landmarks
                 normalized_landmarks = self.normalize_landmarks(landmarks)
@@ -368,7 +467,8 @@ class RPSLandmarkExtractor:
                     label=gesture_name,
                 )
 
-        return normalized_landmarks_3d, gesture_name
+        # return normalized_landmarks_3d, gesture_name
+        return [], []
 
     def extract_features_angles(
         self, video_dir, destination_dir, save_data: bool = False, method="from_mcp"
@@ -411,17 +511,36 @@ class RPSLandmarkExtractor:
 
 if __name__ == "__main__":
 
-    feature_extractor = RPSLandmarkExtractor()
-    landmarks = feature_extractor.extract_landmarks_raw(
-        "/Users/christina/code/RockPaperScissors/my_rps_dataset/data", "./landmarks"
-    )
+    # feature_extractor = RPSLandmarkExtractor()
+    # landmarks = feature_extractor.extract_landmarks_raw(
+    #     "/Users/christina/code/RockPaperScissors/my_rps_dataset/data", "./landmarks"
+    # )
+    #
+    # feature_extractor = RPSLandmarkExtractor()
+    # land, gest = feature_extractor.extract_features_coords(
+    #     "./landmarks", "./features_coords", save_data=True
+    # )
+    #
+    # feature_extractor = RPSLandmarkExtractor()
+    # land, gest = feature_extractor.extract_features_angles(
+    #     "./landmarks", "./features_angles", save_data=True, method="from_mcp"
+    # )
 
-    feature_extractor = RPSLandmarkExtractor()
+    ##############
+    # FOR IMAGES #
+    ##############
+
+    # feature_extractor = RPSLandmarkExtractor(hand_static_mode=True)
+    # landmarks = feature_extractor.extract_landmarks_raw_img(
+    #     f"../../{ALIGN_DIR}", "./landmarks_img", save_data=False
+    # )
+
+    feature_extractor = RPSLandmarkExtractor(hand_static_mode=True)
     land, gest = feature_extractor.extract_features_coords(
-        "./landmarks", "./features_coords", save_data=True
+        "./landmarks", "./features_img/features_coords", save_data=True
     )
 
-    feature_extractor = RPSLandmarkExtractor()
-    land, gest = feature_extractor.extract_features_angles(
-        "./landmarks", "./features_angles", save_data=True, method="from_mcp"
-    )
+    # data = np.load(
+    #    "/Users/christina/code/RockPaperScissors_backup/my_rps_dataset/landmarks_img/paper_20_landmarks.npz"
+    # )
+    # print(data["landmarks"])
