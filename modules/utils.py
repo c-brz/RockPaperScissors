@@ -9,6 +9,10 @@ DATA_DIR_LIST = [
     "../../my_rps_dataset/features_angles",
 ]
 ALIGN_DIR = "RockPaperScissors/my_rps_dataset/data/align/"
+LANDMARKS_DIR = "/Users/christina/code/RockPaperScissors/my_rps_dataset/landmarks"
+LANDMARKS_IMG_DIR = (
+    "/Users/christina/code/RockPaperScissors/my_rps_dataset/landmarks_img"
+)
 
 OBS_RATIOS = [10, 20, 30, 40, 50, 60, 70, 80, 90, 100]
 
