@@ -91,7 +91,7 @@ def get_video_metadata(video_dir):
     all_metadata = []
     for gesture_name in gesture_dirs:
         images_path = os.path.join(video_dir, gesture_name, "images")
-        # Safely check if images_path contains any files
+        # Check if images_path contains any files
         if not os.path.exists(images_path):
             print(f"{images_path} does not exist")
             continue
@@ -106,9 +106,8 @@ def get_video_metadata(video_dir):
         ]
 
         # metadata_path = os.path.join(video_dir, gesture_name, "images/metadata.json")
-        # print(f"Reading {metadata_path}")
         print(f"{gesture_name}: {len(image_dirs)} image files")
-        print(metadata_files)
+        # print(metadata_files)
         all_metadata.extend(metadata_files)
     return all_metadata
 
