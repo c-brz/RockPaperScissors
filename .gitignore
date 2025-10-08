@@ -20,3 +20,9 @@ my_rps_dataset/features_angles2/
 rock-paper-scissors-11/
 runs/
 pytorch-softdtw-cuda/
+
+modules/get_frames.ipynb
+modules/out.txt
+data_cleaning_test
+
+modules/find_prototype_sample_time.ipynb
