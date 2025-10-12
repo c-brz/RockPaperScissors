@@ -153,3 +153,31 @@ def load_splits_cropped(gesture_dir, data_dir):
                 samples.append({"id": f"{vid_name}", "label": gesture, "landmarks": lm})
         datasets[gesture] = samples
     return datasets
+
+
+def normalize_landmarks1(
+    landmarks_df: pd.DataFrame,
+    coord_cols,
+    group_col: str = "frame_idx",
+) -> pd.DataFrame:
+    """Normalize landmarks relative to wrist position at each frame."""
+
+    if landmarks_df.empty:
+        return landmarks_df
+
+    def subtract_wrist_coords(group):
+        vec = group.iloc[0][list(coord_cols)].to_numpy(dtype=float)
+        res = group.copy()
+        res[["x_world_norm", "y_world_norm", "z_world_norm"]] = res.loc[
+            :, list(coord_cols)
+        ].subtract(vec, axis=1)
+        return res
+
+    result = landmarks_df.copy()
+    result.loc[:, ["x_world_norm", "y_world_norm", "z_world_norm"]] = (
+        landmarks_df.groupby(group_col, group_keys=False)[list(coord_cols)].apply(
+            subtract_wrist_coords
+        )
+    )
+
+    return result
