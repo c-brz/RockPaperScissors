@@ -425,4 +425,5 @@ def main():
 
 
 if __name__ == "__main__":
+    # Example usage: python hand_world_keypoints.py "../../RockPaperScissors/my_rps_dataset/data/align2" --recursive --save_overlay --save_csv img_landmarks
     main()
