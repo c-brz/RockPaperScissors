@@ -6,7 +6,14 @@ import numpy as np
 import mediapipe as mp
 
 
-def extract_frame_images(video_dir, destination_dir, gesture_class=None, save=False):
+def extract_frame_images(
+    video_dir,
+    destination_dir,
+    gesture_class=None,
+    save=False,
+    save_to_colorspace="RGB",
+    overwrite=False,
+):
     """Process all videos in a directory structure"""
     # Expected directory structure: video_dir/gesture_name/video_files
 
@@ -31,6 +38,22 @@ def extract_frame_images(video_dir, destination_dir, gesture_class=None, save=Fa
                 print(f"Error opening video file {video_path}")
                 continue
 
+            new_images_dir = os.path.join(
+                destination_dir, gesture_name, "images", video_file_name
+            )
+            if (
+                not os.path.isdir(new_images_dir)  # dir does not exist
+                or (
+                    os.path.isdir(new_images_dir)
+                    and len(os.listdir(new_images_dir)) == 0
+                )  # dir exists but is empty
+                or overwrite  # exists but we overwrite
+            ):
+                print("🤩 Creating images for video:", video_file_name)
+            else:
+                print("     Skipping existing video:", video_file_name)
+                continue  # skip already processed videos
+
             N_FRAMES = int(cap.get(cv2.CAP_PROP_FRAME_COUNT))
             frame_idx = 0
             while True:
@@ -41,13 +64,21 @@ def extract_frame_images(video_dir, destination_dir, gesture_class=None, save=Fa
                 image_dir = os.path.join(
                     destination_dir, gesture_name, "images", video_file_name
                 )
+
                 os.makedirs(image_dir, exist_ok=True)
+
                 # frame_idx = int(cap.get(cv2.CAP_PROP_POS_FRAMES))
                 image_file = os.path.join(
-                    image_dir, f"frame_{str(frame_idx).zfill(3)}.png"
+                    image_dir, f"frame_{str(frame_idx).zfill(4)}.png"
                 )
                 if save:
-                    cv2.imwrite(image_file, rgb_frame)
+                    # cv2.imwrite(image_file, rgb_frame)
+                    if save_to_colorspace == "RGB":
+                        cv2.imwrite(
+                            image_file, cv2.cvtColor(rgb_frame, cv2.COLOR_RGB2BGR)
+                        )
+                    else:
+                        cv2.imwrite(image_file, rgb_frame)
                 frame_idx += 1
             cap.release()
 
@@ -91,16 +122,63 @@ def create_empty_metadata_file(destination_dir, gesture_class=None):
 
 if __name__ == "__main__":
 
-    gesture = sys.argv[1] if len(sys.argv) > 1 else None
+    # Check how many command line arguments are provided
+    # Valid arguments:
+    # 1. gesture class (optional): e.g., "rock", "paper", "scissors" else checks all directories
+    # 2. --overwrite flag (optional): whether to overwrite existing images
+    # 3. --save flag: whether to save extracted images
+
+    if len(sys.argv) > 4:
+        print(
+            "Usage: python video_frames_to_img.py [gesture_class] [--overwrite] [--save]"
+        )
+        sys.exit(1)
+    elif len(sys.argv) == 4:
+        gesture = sys.argv[1]
+        overwrite = sys.argv[2] == "--overwrite"
+        save = sys.argv[3] == "--save"
+    elif len(sys.argv) == 3:
+        if (sys.argv[1] == "--overwrite" and sys.argv[2] == "--save") or (
+            sys.argv[2] == "--overwrite" and sys.argv[1] == "--save"
+        ):
+            gesture = None
+            overwrite = True
+            save = True
+        elif sys.argv[2] == "--overwrite":
+            gesture = sys.argv[1]
+            overwrite = True
+            save = False
+        elif sys.argv[2] == "--save":
+            gesture = sys.argv[1]
+            overwrite = False
+            save = True
+    elif len(sys.argv) == 2:
+        if sys.argv[1] == "--overwrite":
+            gesture = None
+            overwrite = True
+            save = False
+        elif sys.argv[1] == "--save":
+            gesture = None
+            overwrite = False
+            save = True
+        else:
+            gesture = sys.argv[1]
+            overwrite = False
+            save = False
+    else:
+        gesture = None
+        overwrite = False
+        save = False
 
     extract_frame_images(
-        video_dir="../../RockPaperScissors/my_rps_dataset/data/align",
-        destination_dir="../../RockPaperScissors/my_rps_dataset/data/align",
+        video_dir="../../RockPaperScissors/my_rps_dataset/data/align2",
+        destination_dir="../../RockPaperScissors/my_rps_dataset/data/align2",
         gesture_class=gesture,
-        save=True,
+        save=save,
+        overwrite=overwrite,
     )
 
     create_empty_metadata_file(
-        destination_dir="../../RockPaperScissors/my_rps_dataset/data/align",
+        destination_dir="../../RockPaperScissors/my_rps_dataset/data/align2",
         gesture_class=gesture,
     )
