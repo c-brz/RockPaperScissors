@@ -4,6 +4,31 @@ import pandas as pd
 from get_frames import get_video_csv, get_frame_landmarks
 from sklearn import preprocessing
 import argparse
+from enum import Enum
+
+
+class Landmarks(Enum):
+    WRIST = 0
+    THUMB_CMC = 1
+    THUMB_MCP = 2
+    THUMB_IP = 3
+    THUMB_TIP = 4
+    INDEX_FINGER_MCP = 5
+    INDEX_FINGER_PIP = 6
+    INDEX_FINGER_DIP = 7
+    INDEX_FINGER_TIP = 8
+    MIDDLE_FINGER_MCP = 9
+    MIDDLE_FINGER_PIP = 10
+    MIDDLE_FINGER_DIP = 11
+    MIDDLE_FINGER_TIP = 12
+    RING_FINGER_MCP = 13
+    RING_FINGER_PIP = 14
+    RING_FINGER_DIP = 15
+    RING_FINGER_TIP = 16
+    PINKY_MCP = 17
+    PINKY_PIP = 18
+    PINKY_DIP = 19
+    PINKY_TIP = 20
 
 
 def normalize_landmarks(
@@ -74,6 +99,83 @@ def scale_landmarks(landmarks_df, group_col, coord_cols):
     return result
 
 
+def compute_global_scaling_factor(
+    video_base_dir: str,
+    csv_name: str,
+    cols_to_use: list,
+    normalize_first: bool = True,
+) -> float:
+
+    def compute_hand_size(landmarks: pd.DataFrame, cols_to_use: list) -> float:
+        """Compute hand size as the distance between wrist and middle finger MCP."""
+        wrist = landmarks[landmarks.landmark_idx == Landmarks.WRIST.value][
+            cols_to_use
+        ].values[0]
+        middle_finger_mcp = landmarks[
+            landmarks.landmark_idx == Landmarks.MIDDLE_FINGER_MCP.value
+        ][cols_to_use].values[0]
+        hand_size = np.linalg.norm(np.array(wrist) - np.array(middle_finger_mcp)).item()
+
+        return hand_size
+
+    ALL_SCALE_FACTORS = []
+    gesture_dirs = [f for f in os.listdir(video_base_dir) if not f.startswith(".")]
+    for gesture_dir in gesture_dirs:
+        gesture_path = os.path.join(video_base_dir, gesture_dir)
+        video_names = [f for f in os.listdir(gesture_path) if not f.startswith(".")]
+
+        vid_dirs = [
+            f
+            for f in os.listdir(os.path.join(gesture_path, "images"))
+            if not f.startswith(".")
+        ]
+
+        for video_name in vid_dirs:
+            df = get_video_csv(video_base_dir, video_name, csv_name)
+            df = normalize_landmarks(df, convert_to_mm=True) if normalize_first else df
+            res = df.groupby("frame_idx").apply(compute_hand_size, cols_to_use).values
+            ALL_SCALE_FACTORS.append(res)
+
+    global_scale_factor = np.mean(
+        [item for sublist in ALL_SCALE_FACTORS for item in sublist]
+    )
+    print(
+        f"\n\n===== Global scale factor: {global_scale_factor} (out of {len(ALL_SCALE_FACTORS)} samples) =====\n\n"
+    )
+    return global_scale_factor
+
+
+def scale_landmarks_fixed(landmarks_df, group_col, coord_cols):
+    """Scale landmarks of each frame by the hand size using fixed landmarks (wrist and middle finger mcp)."""
+
+    def scale_func(grouped_landmarks, coord_cols, feature_range=(-1, 1)):
+
+        if grouped_landmarks.empty:
+            return grouped_landmarks
+
+        res = grouped_landmarks.copy()
+        new_cols = [
+            i.replace("_norm", "_scaled") for i in coord_cols
+        ]  # TODO: make this more general
+
+        hand_size = np.linalg.norm(
+            res[res.landmark_idx == Landmarks.PINKY_TIP.value][coord_cols].values
+            - res[res.landmark_idx == Landmarks.WRIST.value][coord_cols].values
+        )
+
+        if hand_size == 0:
+            hand_size = 1.0
+
+        res.loc[:, new_cols] = grouped_landmarks[coord_cols].values / hand_size
+
+        return res
+
+    result = landmarks_df.groupby(group_col, group_keys=False).apply(
+        scale_func, coord_cols
+    )
+    return result
+
+
 def rotate_landmarks(landmarks_df, group_col, coords_col) -> pd.DataFrame:
 
     if landmarks_df.empty:
@@ -102,9 +204,9 @@ def rotate_landmarks(landmarks_df, group_col, coords_col) -> pd.DataFrame:
 
         R = np.stack([new_x_axis, new_y_axis, new_z_axis], axis=1)
         assert np.allclose(np.linalg.det(R), 1.0), "Rotation matrix is not valid"
-        rotated_coords = np.dot(
-            R.T, ((grp1[coords_col].values + 1) / 2).T
-        ).T  # TODO: removed wrist subtraction
+        rotated_coords = np.dot(R.T, ((grp1[coords_col].values)).T).T
+        rotated_coords = (rotated_coords + 1) / 2
+        rotated_coords = rotated_coords - rotated_coords[0]
         result.loc[:, ["x_world_rotated", "y_world_rotated", "z_world_rotated"]] = (
             rotated_coords
         )
@@ -212,6 +314,14 @@ if __name__ == "__main__":
     csv_name = args.csv_name
     save_as = args.save_as
 
+    GLOBAL_SCALE_FACTOR = compute_global_scaling_factor(
+        video_base_dir,
+        csv_name,
+        cols_to_use=["x_world_norm", "y_world_norm", "z_world_norm"],
+        normalize_first=True,
+    )
+    print(f"Using GLOBAL_SCALE_FACTOR={GLOBAL_SCALE_FACTOR}")
+
     # video_base_dir = ("/Users/christina/code/RockPaperScissors/my_rps_dataset/data/align2")
     # csv_name = "img_landmarks"
     gesture_dirs = [f for f in os.listdir(video_base_dir) if not f.startswith(".")]
@@ -238,14 +348,26 @@ if __name__ == "__main__":
                 convert_to_mm=True,
             )
 
+            # df_scaled = scale_landmarks(
+            #     df_norm,
+            #     group_col="frame_idx",
+            #     coord_cols=["x_world_norm", "y_world_norm", "z_world_norm"],
+            # )
+
             df_scaled = scale_landmarks(
                 df_norm,
                 group_col="frame_idx",
                 coord_cols=["x_world_norm", "y_world_norm", "z_world_norm"],
             )
 
+            df_scaled2 = df_norm.copy()
+            df_scaled2[["x_world_scaled", "y_world_scaled", "z_world_scaled"]] = (
+                df_norm[["x_world_norm", "y_world_norm", "z_world_norm"]]
+                / GLOBAL_SCALE_FACTOR
+            )
+
             df_rotated = rotate_landmarks(
-                df_scaled,
+                df_scaled2,
                 group_col="frame_idx",
                 coords_col=[
                     "x_world_scaled",
@@ -254,6 +376,9 @@ if __name__ == "__main__":
                 ],
             )
 
+            df_rotated[["x_world_scaled", "y_world_scaled", "z_world_scaled"]] = (
+                df_scaled[["x_world_scaled", "y_world_scaled", "z_world_scaled"]]
+            )
             # df_rotated = get_video_csv(video_base_dir, video_name, csv_name)
 
             if args.compute_angles:
